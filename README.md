@@ -27,7 +27,7 @@ If the maker set a `cancelDelay`, they can reclaim their locked funds after the 
 
 ## The Swap Script
 
-The covenant is an [Arkade script](https://github.com/arkade-os/arkade-script) embedded in a taproot leaf of the swap VTXO. It uses introspection opcodes to enforce spending conditions without requiring the maker's signature at fulfillment time.
+The covenant is an [Arkade script](https://docs.arkadeos.com/experimental/arkade-compiler) embedded in a taproot leaf of the swap VTXO. It uses introspection opcodes to enforce spending conditions without requiring the maker's signature at fulfillment time.
 
 The **fulfill script** verifies two conditions on the transaction outputs:
 
