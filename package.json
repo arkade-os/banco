@@ -1,0 +1,60 @@
+{
+    "name": "@arkade-os/banco",
+    "version": "0.0.1",
+    "description": "Banco swap protocol for Ark",
+    "type": "module",
+    "main": "./dist/cjs/index.js",
+    "module": "./dist/esm/index.js",
+    "types": "./dist/types/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/types/index.d.ts",
+            "import": "./dist/esm/index.js",
+            "require": "./dist/cjs/index.js",
+            "default": "./dist/esm/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    },
+    "scripts": {
+        "build": "rimraf dist && pnpm run build:esm && pnpm run build:cjs && pnpm run build:types",
+        "build:esm": "tsc -p tsconfig.esm.json --outDir dist/esm",
+        "build:cjs": "tsc -p tsconfig.cjs.json --outDir dist/cjs",
+        "build:types": "tsc -p tsconfig.json --outDir dist/types --emitDeclarationOnly",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "format": "prettier --write src test",
+        "lint": "prettier --check src test"
+    },
+    "dependencies": {
+        "@arkade-os/sdk": "https://github.com/arkade-os/ts-sdk.git#arkade-script-final",
+        "@scure/base": "2.0.0"
+    },
+    "devDependencies": {
+        "@vitest/coverage-v8": "3.2.4",
+        "prettier": "3.6.2",
+        "rimraf": "^6.1.2",
+        "typescript": "5.9.2",
+        "vitest": "3.2.4"
+    },
+    "keywords": [
+        "bitcoin",
+        "ark",
+        "banco",
+        "swap",
+        "arkade"
+    ],
+    "author": "Ark Labs",
+    "license": "MIT",
+    "packageManager": "pnpm@10.25.0",
+    "engines": {
+        "node": ">=22.12.0 <23",
+        "pnpm": ">=10.25.0 <11"
+    }
+}
