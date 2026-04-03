@@ -1,6 +1,6 @@
 # Banco
 
-Non-interactive swap protocol for [Ark](https://ark-protocol.org). Banco enables trustless atomic swaps between BTC and assets (or asset-to-asset) on the Ark network without requiring both parties to be online at the same time.
+Non-interactive swap protocol for Ark. Banco enables trustless atomic swaps between BTC and assets (or asset-to-asset) on the Ark network without requiring both parties to be online at the same time.
 
 ## How it works
 
