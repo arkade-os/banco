@@ -136,4 +136,4 @@ pnpm build      # compile TypeScript
 
 ## License
 
-MIT
+[MIT](LICENSE)
