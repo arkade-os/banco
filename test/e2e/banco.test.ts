@@ -246,7 +246,7 @@ describe("banco", () => {
         }
     );
 
-    it.skip(
+    it(
         "partial fill: taker fills half of an asset-for-BTC offer",
         { timeout: 120000 },
         async () => {
@@ -306,9 +306,11 @@ describe("banco", () => {
             const swapVtxos = await waitForVtxo(swapPkScript);
             expect(swapVtxos).toHaveLength(1);
 
-            // ── Step 4: Fund taker with BTC (fillBtc + dust for change) ──
+            // ── Step 4: Fund taker with BTC ──
+            // Enough for two fills of fillBtc each, plus dust (≥330) for the
+            // final asset-carrying change output to clear arkd's dust limit.
             const fillBtc = 5_000n;
-            faucetOffchain(takerAddress, 10_000);
+            faucetOffchain(takerAddress, 11_000);
             await new Promise((r) => setTimeout(r, 1000));
 
             // ── Step 5: Taker does a partial fill ──
@@ -362,6 +364,64 @@ describe("banco", () => {
                     `taker got ${takerAsset!.amount}/${assetAmount} units of asset, ` +
                     `${remainingAsset!.amount} units remain in swap ` +
                     `(txid: ${txid})`
+            );
+
+            // ── Step 7: A fresh second taker empties the remainder ──
+            // consumed = 5000 * 1 / 10 = 500 == remaining → full-fill branch
+            // of the partial-fill script. Using a fresh wallet avoids
+            // entangling the first taker's existing offerAsset holding with
+            // the asset packet.
+            const taker2Wallet = await createTestArkWallet();
+            const taker2Address = await taker2Wallet.wallet.getAddress();
+            faucetOffchain(taker2Address, 6_000);
+            await new Promise((r) => setTimeout(r, 1000));
+
+            const taker2 = new Taker(
+                taker2Wallet.wallet,
+                ARK_SERVER_URL,
+                INTROSPECTOR_URL
+            );
+
+            const { txid: txid2 } = await taker2.fulfill(offerHex, {
+                fillAmount: fillBtc,
+            });
+            expect(txid2).toBeDefined();
+            await new Promise((r) => setTimeout(r, 2000));
+
+            // ── Step 8: Verify the swap is fully consumed ──
+            const finalSwapResp = await indexer.getVtxos({
+                scripts: [hex.encode(swapPkScript)],
+                spendableOnly: true,
+            });
+            expect(finalSwapResp.vtxos).toHaveLength(0);
+
+            // Maker should have received both fills.
+            const makerAfterSecond = await waitForVtxo(makerDecoded.pkScript, 4);
+            const makerBtcAfterSecond = makerAfterSecond.reduce(
+                (s: number, v: any) => s + v.value,
+                0
+            );
+            expect(makerBtcAfterSecond).toBeGreaterThanOrEqual(
+                makerBtcReceived + Number(fillBtc)
+            );
+
+            // The two takers together should hold all 1000 asset units.
+            const taker2Decoded = ArkAddress.decode(taker2Address);
+            const taker2Vtxos = await waitForVtxo(taker2Decoded.pkScript, 1);
+            const taker2AssetTotal = taker2Vtxos
+                .flatMap((v: any) => v.assets ?? [])
+                .filter((a: any) => a.assetId === issueResult.assetId)
+                .reduce((s: number, a: any) => s + a.amount, 0);
+            expect(taker2AssetTotal).toBe(500);
+            const totalDistributed = takerAsset!.amount + taker2AssetTotal;
+            expect(totalDistributed).toBe(assetAmount);
+
+            console.log(
+                `Second fill complete: swap fully consumed, ` +
+                    `maker total ${makerBtcAfterSecond} sats BTC, ` +
+                    `taker1 ${takerAsset!.amount} + taker2 ${taker2AssetTotal} = ` +
+                    `${totalDistributed}/${assetAmount} asset units ` +
+                    `(txid: ${txid2})`
             );
         }
     );

@@ -27,14 +27,19 @@
         "build:esm": "tsc -p tsconfig.esm.json --outDir dist/esm",
         "build:cjs": "tsc -p tsconfig.cjs.json --outDir dist/cjs",
         "build:types": "tsc -p tsconfig.json --outDir dist/types --emitDeclarationOnly",
-        "test": "vitest run",
+        "test": "vitest run --exclude test/e2e",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
+        "test:e2e": "vitest run test/e2e",
+        "regtest:start": "./regtest/start-env.sh --env .env.regtest && docker compose -f docker-compose.introspector.yml up -d && (docker exec arkd ark init --password secret --server-url localhost:7070 --explorer http://chopsticks:3000 2>/dev/null || true)",
+        "regtest:stop": "docker compose -f docker-compose.introspector.yml down 2>/dev/null; ./regtest/stop-env.sh",
+        "regtest:clean": "docker compose -f docker-compose.introspector.yml down -v 2>/dev/null; ./regtest/clean-env.sh",
+        "regtest": "pnpm regtest:clean && pnpm regtest:start",
         "format": "prettier --write src test",
         "lint": "prettier --check src test"
     },
     "dependencies": {
-        "@arkade-os/sdk": "https://github.com/arkade-os/ts-sdk.git#arkade-script-final",
+        "@arkade-os/sdk": "github:louisinger/wallet-sdk#arkade-script-final",
         "@scure/base": "2.0.0"
     },
     "devDependencies": {

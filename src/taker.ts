@@ -12,8 +12,10 @@ import {
     asset,
     Extension,
     IntrospectorPacket,
+    PrevArkTxField,
     selectCoinsWithAsset,
     selectVirtualCoins,
+    setArkPsbtField,
 } from "@arkade-os/sdk";
 import type { IWallet, ExtendedVirtualCoin } from "@arkade-os/sdk";
 import { Offer } from "./offer";
@@ -545,54 +547,54 @@ export class Taker {
             checkpointUnrollClosure
         );
 
+        // Partial-fill scripts inspect the swap VTXO's previous output via
+        // INSPECTINPUTSCRIPTPUBKEY / INSPECTINPUTVALUE. The introspector resolves
+        // those by reading PrevArkTxField from the ark tx's input. Set it to the
+        // funding tx of the swap VTXO so the introspector can fetch the prev out.
+        if (isPartial) {
+            const { txs: fundingTxs } = await this.indexer.getVirtualTxs([
+                swapVtxo.txid,
+            ]);
+            if (fundingTxs.length === 0) {
+                throw new Error(
+                    `Funding tx ${swapVtxo.txid} not found at indexer`
+                );
+            }
+            const fundingTx = Transaction.fromPSBT(
+                base64.decode(fundingTxs[0])
+            );
+            setArkPsbtField(arkTx, 0, PrevArkTxField, fundingTx.unsignedTx);
+        }
+
         const takerInputIndexes = takerInputs.map((_, i) => i + 1);
         const signedArkTx = await this.wallet.identity.sign(
             arkTx,
             takerInputIndexes
         );
 
-        const introResult = await this.introspector.submitTx(
-            base64.encode(signedArkTx.toPSBT()),
-            checkpoints.map((c) => base64.encode(c.toPSBT()))
-        );
-
-        const introCheckpoint0 = Transaction.fromPSBT(
-            base64.decode(introResult.signedCheckpointTxs[0])
-        );
-        const introInput0 = introCheckpoint0.getInput(0);
-        if (
-            !introInput0.tapScriptSig ||
-            introInput0.tapScriptSig.length === 0
-        ) {
-            throw new Error("Introspector did not sign the swap checkpoint");
-        }
-
-        const { arkTxid, signedCheckpointTxs } =
-            await this.arkProvider.submitTx(
-                introResult.signedArkTx,
-                introResult.signedCheckpointTxs
-            );
-
-        const finalCheckpoints = await Promise.all(
-            signedCheckpointTxs.map(async (serverCp, i) => {
-                const serverTx = Transaction.fromPSBT(base64.decode(serverCp));
-                const introTx = Transaction.fromPSBT(
-                    base64.decode(introResult.signedCheckpointTxs[i])
-                );
-                serverTx.combine(introTx);
-
-                if (i > 0) {
-                    const signed = await this.wallet.identity.sign(serverTx, [
-                        0,
-                    ]);
-                    return base64.encode(signed.toPSBT());
-                }
-                return base64.encode(serverTx.toPSBT());
+        // Pre-sign each taker checkpoint (input 0) before sending to the
+        // introspector. Skip checkpoint 0 — that's the swap VTXO checkpoint,
+        // which has no taker key in its closure (the introspector signs it).
+        const signedCheckpoints = await Promise.all(
+            checkpoints.map(async (cp, i) => {
+                if (i === 0) return cp;
+                return this.wallet.identity.sign(cp, [0]);
             })
         );
 
-        await this.arkProvider.finalizeTx(arkTxid, finalCheckpoints);
-        return { txid: arkTxid };
+        // Submit to the introspector. Because the introspector tweaked key is
+        // the last non-arkd signer in the swap fulfill closure, the introspector
+        // takes on the finalizer role: it forwards to arkd, merges arkd's
+        // checkpoint signatures, calls FinalizeTx, and returns the final ark tx.
+        const introResult = await this.introspector.submitTx(
+            base64.encode(signedArkTx.toPSBT()),
+            signedCheckpoints.map((c) => base64.encode(c.toPSBT()))
+        );
+
+        const finalArkTx = Transaction.fromPSBT(
+            base64.decode(introResult.signedArkTx)
+        );
+        return { txid: finalArkTx.id };
     }
 
     /** Gather unrelated (collateral) assets from taker coins into asset groups. */

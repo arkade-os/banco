@@ -37,12 +37,6 @@ const KNOWN_TYPES = new Set([
     TLV_EXIT_TIMELOCK,
 ]);
 
-function bigintToLE64(n: bigint): Uint8Array {
-    const buf = new Uint8Array(8);
-    new DataView(buf.buffer).setBigInt64(0, n, true);
-    return buf;
-}
-
 function writeTLV(type: number, value: Uint8Array): Uint8Array {
     const record = new Uint8Array(3 + value.length);
     record[0] = type;
@@ -407,35 +401,32 @@ export namespace Offer {
             "EQUAL",
         ] as const;
 
-        const valueCheck = [
-            0,
-            "INSPECTOUTPUTVALUE",
-            Number(offer.wantAmount),
-            "SCRIPTNUMTOLE64",
-            "GREATERTHANOREQUAL64",
-            "VERIFY",
-        ] as const;
-
+        // INSPECTOUTPUTVALUE pushes a BigNum; the wantAmount literal is
+        // BigNum-encoded by ArkadeScript.encode, so unified GREATERTHANOREQUAL
+        // compares them directly.
         if (!offer.wantAsset) {
-            return ArkadeScript.encode([...valueCheck, ...scriptPubKeyCheck]);
+            return ArkadeScript.encode([
+                0,
+                "INSPECTOUTPUTVALUE",
+                offer.wantAmount,
+                "GREATERTHANOREQUAL",
+                "VERIFY",
+                ...scriptPubKeyCheck,
+            ]);
         }
 
         const txidInternalOrder = offer.wantAsset.txid.slice().reverse();
 
+        // INSPECTOUTASSETLOOKUP pushes (amount, success_flag) — VERIFY consumes
+        // the flag, leaving the BigNum amount on the stack to compare directly.
         return ArkadeScript.encode([
             0,
             txidInternalOrder,
             0,
             "INSPECTOUTASSETLOOKUP",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
-            Number(offer.wantAmount),
-            "SCRIPTNUMTOLE64",
-            "GREATERTHANOREQUAL64",
+            offer.wantAmount,
+            "GREATERTHANOREQUAL",
             "VERIFY",
             ...scriptPubKeyCheck,
         ]);
@@ -465,65 +456,54 @@ export namespace Offer {
     function btcForAssetScript(offer: Omit<Data, "swapPkScript">): Uint8Array {
         const want = offer.wantAsset as asset.AssetId;
         const makerWP = offer.makerPkScript.subarray(2);
-        const ratioNumLE = bigintToLE64(offer.ratioNum!);
-        const ratioDenLE = bigintToLE64(offer.ratioDen!);
-        const zeroLE64 = new Uint8Array(8);
         const wantTxid = want.txid.slice().reverse();
 
         return ArkadeScript.encode([
+            // We must be spending input 0 (the swap VTXO).
             "PUSHCURRENTINPUTINDEX",
             0,
             "EQUALVERIFY",
+            // Output 1 must pay the maker (taproot v1 + makerWP).
             1,
             "INSPECTOUTPUTSCRIPTPUBKEY",
             1,
             "EQUALVERIFY",
             makerWP,
             "EQUALVERIFY",
+            // Find the wanted asset's group position in the asset packet.
             wantTxid,
             "DUP",
             "TOALTSTACK",
             want.groupIndex,
             "FINDASSETGROUPBYASSETID",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
+            // Look up the asset amount delivered at output 1.
             1,
             "SWAP",
             "FROMALTSTACK",
             "SWAP",
             "INSPECTOUTASSETLOOKUP",
+            "VERIFY",
             "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
+            0,
+            "GREATERTHAN",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
-            "DUP",
-            zeroLE64,
-            "GREATERTHAN64",
-            "VERIFY",
-            ratioNumLE,
-            "MUL64",
-            "VERIFY",
-            ratioDenLE,
-            "DIV64",
-            "VERIFY",
-            "NIP",
+            // consumed_btc = amount * ratioNum / ratioDen
+            offer.ratioNum!,
+            "MUL",
+            offer.ratioDen!,
+            "DIV",
             "PUSHCURRENTINPUTINDEX",
             "INSPECTINPUTVALUE",
             "2DUP",
             "SWAP",
-            "LESSTHANOREQUAL64",
+            "LESSTHANOREQUAL",
             "IF",
             "2DROP",
             1,
             "ELSE",
             "SWAP",
-            "SUB64",
-            "VERIFY",
+            "SUB",
             0,
             "INSPECTOUTPUTVALUE",
             "EQUALVERIFY",
@@ -542,63 +522,55 @@ export namespace Offer {
     function assetForBtcScript(offer: Omit<Data, "swapPkScript">): Uint8Array {
         const offerAsset = offer.offerAsset as asset.AssetId;
         const makerWP = offer.makerPkScript.subarray(2);
-        const ratioNumLE = bigintToLE64(offer.ratioNum!);
-        const ratioDenLE = bigintToLE64(offer.ratioDen!);
-        const zeroLE64 = new Uint8Array(8);
         const offerTxid = offerAsset.txid.slice().reverse();
 
         return ArkadeScript.encode([
+            // We must be spending input 0 (the swap VTXO).
             "PUSHCURRENTINPUTINDEX",
             0,
             "EQUALVERIFY",
+            // Output 1 must pay the maker (taproot v1 + makerWP).
             1,
             "INSPECTOUTPUTSCRIPTPUBKEY",
             1,
             "EQUALVERIFY",
             makerWP,
             "EQUALVERIFY",
+            // Read output[1].value (BTC paid to maker) and verify > 0.
             1,
             "INSPECTOUTPUTVALUE",
             "DUP",
-            zeroLE64,
-            "GREATERTHAN64",
+            0,
+            "GREATERTHAN",
             "VERIFY",
+            // Save offerTxid twice on alt stack (used by two later lookups).
             offerTxid,
             "DUP",
             "DUP",
             "TOALTSTACK",
             "TOALTSTACK",
+            // Find offerAsset group + read input asset amount.
             offerAsset.groupIndex,
             "FINDASSETGROUPBYASSETID",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
             "PUSHCURRENTINPUTINDEX",
             "SWAP",
             "FROMALTSTACK",
             "SWAP",
             "INSPECTINASSETLOOKUP",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
             "TOALTSTACK",
-            ratioNumLE,
-            "MUL64",
-            "VERIFY",
-            ratioDenLE,
-            "DIV64",
-            "VERIFY",
-            "NIP",
+            // consumed_asset = output1Value * ratioNum / ratioDen
+            offer.ratioNum!,
+            "MUL",
+            offer.ratioDen!,
+            "DIV",
             "FROMALTSTACK",
             "2DUP",
             "SWAP",
-            "LESSTHANOREQUAL64",
+            "LESSTHANOREQUAL",
             "IF",
+            // Full fill: output 0 must be maker (BTC carrier from swap VTXO).
             "2DROP",
             0,
             "INSPECTOUTPUTSCRIPTPUBKEY",
@@ -606,6 +578,7 @@ export namespace Offer {
             "EQUALVERIFY",
             makerWP,
             "EQUALVERIFY",
+            // input BTC value == output 0 BTC value.
             "PUSHCURRENTINPUTINDEX",
             "INSPECTINPUTVALUE",
             0,
@@ -613,9 +586,10 @@ export namespace Offer {
             "EQUALVERIFY",
             1,
             "ELSE",
+            // Partial fill: change_asset = inputAssetAmt - consumed_asset.
             "SWAP",
-            "SUB64",
-            "VERIFY",
+            "SUB",
+            // input pkScript == output 0 pkScript (swap continues).
             "PUSHCURRENTINPUTINDEX",
             "INSPECTINPUTSCRIPTPUBKEY",
             0,
@@ -623,30 +597,23 @@ export namespace Offer {
             "ROT",
             "EQUALVERIFY",
             "EQUALVERIFY",
+            // input BTC value == output 0 BTC value (carrier preserved).
             "PUSHCURRENTINPUTINDEX",
             "INSPECTINPUTVALUE",
             0,
             "INSPECTOUTPUTVALUE",
             "EQUALVERIFY",
+            // output 0 has change_asset of offerAsset.
             offerTxid,
             offerAsset.groupIndex,
             "FINDASSETGROUPBYASSETID",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
             0,
             "SWAP",
             "FROMALTSTACK",
             "SWAP",
             "INSPECTOUTASSETLOOKUP",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
             "EQUAL",
             "ENDIF",
         ]);
@@ -659,83 +626,66 @@ export namespace Offer {
         const want = offer.wantAsset as asset.AssetId;
         const offerAsset = offer.offerAsset as asset.AssetId;
         const makerWP = offer.makerPkScript.subarray(2);
-        const ratioNumLE = bigintToLE64(offer.ratioNum!);
-        const ratioDenLE = bigintToLE64(offer.ratioDen!);
-        const zeroLE64 = new Uint8Array(8);
         const wantTxid = want.txid.slice().reverse();
         const offerTxid = offerAsset.txid.slice().reverse();
 
         return ArkadeScript.encode([
+            // We must be spending input 0 (the swap VTXO).
             "PUSHCURRENTINPUTINDEX",
             0,
             "EQUALVERIFY",
+            // Output 1 must pay the maker (taproot v1 + makerWP).
             1,
             "INSPECTOUTPUTSCRIPTPUBKEY",
             1,
             "EQUALVERIFY",
             makerWP,
             "EQUALVERIFY",
+            // Look up wanted-asset amount delivered at output 1.
             wantTxid,
             "DUP",
             "TOALTSTACK",
             want.groupIndex,
             "FINDASSETGROUPBYASSETID",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
             1,
             "SWAP",
             "FROMALTSTACK",
             "SWAP",
             "INSPECTOUTASSETLOOKUP",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
             "DUP",
-            zeroLE64,
-            "GREATERTHAN64",
+            0,
+            "GREATERTHAN",
             "VERIFY",
+            // Save offerTxid twice on alt stack (used by two later lookups).
             offerTxid,
             "DUP",
             "DUP",
             "TOALTSTACK",
             "TOALTSTACK",
+            // Find offerAsset group + read input asset amount.
             offerAsset.groupIndex,
             "FINDASSETGROUPBYASSETID",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
             "PUSHCURRENTINPUTINDEX",
             "SWAP",
             "FROMALTSTACK",
             "SWAP",
             "INSPECTINASSETLOOKUP",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
             "TOALTSTACK",
-            ratioNumLE,
-            "MUL64",
-            "VERIFY",
-            ratioDenLE,
-            "DIV64",
-            "VERIFY",
-            "NIP",
+            // consumed_offer = wantedAmount * ratioNum / ratioDen
+            offer.ratioNum!,
+            "MUL",
+            offer.ratioDen!,
+            "DIV",
             "FROMALTSTACK",
             "2DUP",
             "SWAP",
-            "LESSTHANOREQUAL64",
+            "LESSTHANOREQUAL",
             "IF",
+            // Full fill: output 0 must be maker (BTC carrier from swap VTXO).
             "2DROP",
             0,
             "INSPECTOUTPUTSCRIPTPUBKEY",
@@ -750,9 +700,10 @@ export namespace Offer {
             "EQUALVERIFY",
             1,
             "ELSE",
+            // Partial fill: change_offer = inputAssetAmt - consumed_offer.
             "SWAP",
-            "SUB64",
-            "VERIFY",
+            "SUB",
+            // input pkScript == output 0 pkScript (swap continues).
             "PUSHCURRENTINPUTINDEX",
             "INSPECTINPUTSCRIPTPUBKEY",
             0,
@@ -760,30 +711,23 @@ export namespace Offer {
             "ROT",
             "EQUALVERIFY",
             "EQUALVERIFY",
+            // input BTC value == output 0 BTC value (carrier preserved).
             "PUSHCURRENTINPUTINDEX",
             "INSPECTINPUTVALUE",
             0,
             "INSPECTOUTPUTVALUE",
             "EQUALVERIFY",
+            // output 0 has change_offer of offerAsset.
             offerTxid,
             offerAsset.groupIndex,
             "FINDASSETGROUPBYASSETID",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
             0,
             "SWAP",
             "FROMALTSTACK",
             "SWAP",
             "INSPECTOUTASSETLOOKUP",
-            "DUP",
-            "1NEGATE",
-            "EQUAL",
-            "NOT",
             "VERIFY",
-            "SCRIPTNUMTOLE64",
             "EQUAL",
             "ENDIF",
         ]);

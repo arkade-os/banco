@@ -128,11 +128,30 @@ const offers = await maker.getOffers(swapPkScript);
 ## Development
 
 ```sh
+git clone --recurse-submodules <this repo>   # arkade-regtest is a submodule
 pnpm install
 pnpm lint       # check formatting
-pnpm test       # run tests
+pnpm test       # run unit tests (excludes test/e2e)
 pnpm build      # compile TypeScript
 ```
+
+### End-to-end tests
+
+E2E tests run against a local regtest stack: nigiri + arkd (matching ts-sdk's
+config) + introspector v0.0.1.
+
+```sh
+pnpm regtest:start   # bring up nigiri, arkd, introspector
+pnpm test:e2e        # run test/e2e/*
+pnpm regtest:stop    # tear down (preserves volumes)
+pnpm regtest:clean   # tear down + wipe volumes
+pnpm regtest         # clean + start
+```
+
+`regtest/` is the [arkade-regtest](https://github.com/ArkLabsHQ/arkade-regtest)
+submodule. Overrides for arkd image, fees, and Bitcoin Core config live in
+`.env.regtest`. The introspector is layered on top via
+`docker-compose.introspector.yml`.
 
 ## License
 
