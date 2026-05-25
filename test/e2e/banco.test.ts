@@ -396,7 +396,10 @@ describe("banco", () => {
             expect(finalSwapResp.vtxos).toHaveLength(0);
 
             // Maker should have received both fills.
-            const makerAfterSecond = await waitForVtxo(makerDecoded.pkScript, 4);
+            const makerAfterSecond = await waitForVtxo(
+                makerDecoded.pkScript,
+                4
+            );
             const makerBtcAfterSecond = makerAfterSecond.reduce(
                 (s: number, v: any) => s + v.value,
                 0
