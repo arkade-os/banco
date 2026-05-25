@@ -24,12 +24,16 @@ the same Arkade transaction that releases the maker's funds.
 | **Maker** | Publishes an offer, funds the swap VTXO, goes offline. | Trustless. |
 | **Taker** | Discovers an offer and submits a fulfillment. | Trustless. |
 | **Operator** | Runs the Arkade infrastructure and cosigns the fulfillment. | Liveness only — cannot steal or redirect funds. |
-| **Introspector** | Validates the covenant at fulfillment time and cosigns. | Liveness only — the covenant is enforced by Arkade script regardless of who validates. |
+| **Emulator** | Validates the covenant at fulfillment time and cosigns. | Liveness only — the covenant is enforced by Arkade script regardless of who validates. |
 
 No party custodies the maker's funds. The covenant binds the spending
 transaction to pay the maker a specific amount of a specific asset to a
-specific scriptPubKey. The Operator or Introspector can refuse to cosign
+specific scriptPubKey. The Operator or Emulator can refuse to cosign
 (denial of service) but cannot redirect funds.
+
+> The Emulator role is exposed in the SDK and wire format under its
+> legacy name, `introspector` (see `introspectorPubkey`,
+> `introspectorUrl`, `RestIntrospectorProvider`).
 
 ## Protocol overview
 
@@ -39,7 +43,7 @@ sequenceDiagram
     participant M as Maker
     participant N as Arkade
     participant T as Taker
-    participant I as Introspector
+    participant I as Emulator
     participant O as Operator
 
     M->>M: derive swap VTXO (covenant taptree)
@@ -66,7 +70,7 @@ sequenceDiagram
 4. **Fulfillment.** The taker selects inputs from their own wallet, builds
    a transaction that satisfies the covenant (output 0 / output 1 must pay
    the maker the wanted amount; for partial fills, the remainder is
-   rebound to the swap address), and submits it through the Introspector
+   rebound to the swap address), and submits it through the Emulator
    and the Operator.
 5. **Settlement.** Atomic, in a single Arkade transaction: the maker
    receives the wanted amount; the taker receives the offered funds (or
@@ -118,7 +122,7 @@ dedicated covenant script; see `src/offer.ts`.
 
 | Leaf | Spendable by | Condition |
 |---|---|---|
-| **Fulfill** | Any taker | Covenant + Introspector cosign + Operator cosign |
+| **Fulfill** | Any taker | Covenant + Emulator cosign + Operator cosign |
 | **Cancel** *(optional)* | Maker + Operator | `CLTV(cancelDelay)` reached |
 | **Exit** *(optional)* | Maker + Operator | `CSV(exitTimelock)` reached |
 
@@ -253,7 +257,7 @@ pnpm regtest         # clean + start
 
 `regtest/` is the [arkade-regtest](https://github.com/ArkLabsHQ/arkade-regtest)
 submodule. Overrides for the arkd image, fees, and Bitcoin Core config
-live in `.env.regtest`. The Introspector is layered on top via
+live in `.env.regtest`. The Emulator is layered on top via
 `docker-compose.introspector.yml`.
 
 ## License
