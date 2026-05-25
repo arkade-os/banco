@@ -28,7 +28,7 @@
         "build:cjs": "tsc -p tsconfig.cjs.json --outDir dist/cjs",
         "build:types": "tsc -p tsconfig.json --outDir dist/types --emitDeclarationOnly",
         "build:markers": "node scripts/build-markers.mjs",
-        "test": "vitest run --exclude test/e2e",
+        "test": "vitest run --passWithNoTests --exclude test/e2e",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "vitest run test/e2e",
