@@ -145,8 +145,10 @@ wrapped in an Arkade extension packet of type `0x03`.
 | `0x0b` | `offerAsset` | serialized `AssetId` | for asset offers |
 | `0x0c` | `exitTimelock` | 1B type (0=blocks, 1=seconds) + uint64 BE | optional |
 
-Decoders MUST reject unknown TLV types. Forward-compatible extensions are
-to be assigned new TLV types in a future revision of this spec.
+Decoders MUST reject unknown TLV types — parsing is strict, not
+forward-compatible. New types defined in future revisions of this spec
+will require decoders to be updated before they can process offers that
+include them.
 
 ## Usage
 
@@ -161,7 +163,7 @@ pnpm add @arkade-os/banco
 ```ts
 import { Maker } from "@arkade-os/banco";
 
-const maker = new Maker(wallet, operatorUrl, introspectorUrl);
+const maker = new Maker(wallet, arkServerUrl, introspectorUrl);
 
 const { offer, swapPkScript, packet } = await maker.createOffer({
   wantAmount: 10_000n,   // 10k sats
@@ -196,7 +198,7 @@ const { offer } = await maker.createOffer({
 ```ts
 import { Taker } from "@arkade-os/banco";
 
-const taker = new Taker(wallet, operatorUrl, introspectorUrl);
+const taker = new Taker(wallet, arkServerUrl, introspectorUrl);
 
 // Full fill from a hex offer
 const { txid } = await taker.fulfill(offerHex);
