@@ -17,7 +17,7 @@ const TLV_WANT_ASSET = 0x03;
 const TLV_CANCEL_DELAY = 0x04;
 const TLV_MAKER_PK_SCRIPT = 0x05;
 const TLV_MAKER_PUBLIC_KEY = 0x07;
-const TLV_INTROSPECTOR_PUBKEY = 0x08;
+const TLV_EMULATOR_PUBKEY = 0x08;
 const TLV_RATIO_NUM = 0x09;
 const TLV_RATIO_DEN = 0x0a;
 const TLV_OFFER_ASSET = 0x0b;
@@ -30,7 +30,7 @@ const KNOWN_TYPES = new Set([
     TLV_CANCEL_DELAY,
     TLV_MAKER_PK_SCRIPT,
     TLV_MAKER_PUBLIC_KEY,
-    TLV_INTROSPECTOR_PUBKEY,
+    TLV_EMULATOR_PUBKEY,
     TLV_RATIO_NUM,
     TLV_RATIO_DEN,
     TLV_OFFER_ASSET,
@@ -78,7 +78,7 @@ function readUint64BE(buf: Uint8Array): bigint {
  * | `0x04` | cancelDelay        | 8-byte big-endian uint64 (optional)  |
  * | `0x05` | makerPkScript      | raw bytes (34)                       |
  * | `0x07` | makerPublicKey     | raw bytes (32)                       |
- * | `0x08` | introspectorPubkey | raw bytes (32)                       |
+ * | `0x08` | emulatorPubkey | raw bytes (32)                       |
  * | `0x09` | ratioNum           | 8-byte big-endian uint64 (optional)  |
  * | `0x0a` | ratioDen           | 8-byte big-endian uint64 (optional)  |
  * | `0x0b` | offerAsset         | raw AssetId bytes (optional)         |
@@ -108,8 +108,8 @@ export namespace Offer {
         makerPkScript: Uint8Array;
         /** Maker's x-only taproot internal key (32 bytes). Required when cancel or exit paths are present. */
         makerPublicKey?: Uint8Array;
-        /** Introspector's x-only public key (32 bytes). */
-        introspectorPubkey: Uint8Array;
+        /** Emulator's x-only public key (32 bytes). */
+        emulatorPubkey: Uint8Array;
         /** Relative timelock for unilateral exit. */
         exitTimelock?: RelativeTimelock;
     }
@@ -149,9 +149,7 @@ export namespace Offer {
         if (offer.makerPublicKey !== undefined) {
             records.push(writeTLV(TLV_MAKER_PUBLIC_KEY, offer.makerPublicKey));
         }
-        records.push(
-            writeTLV(TLV_INTROSPECTOR_PUBKEY, offer.introspectorPubkey)
-        );
+        records.push(writeTLV(TLV_EMULATOR_PUBKEY, offer.emulatorPubkey));
         if (offer.exitTimelock !== undefined) {
             const buf = new Uint8Array(9);
             buf[0] = offer.exitTimelock.type === "seconds" ? 1 : 0;
@@ -187,7 +185,7 @@ export namespace Offer {
         let cancelDelay: bigint | undefined;
         let makerPkScript: Uint8Array | undefined;
         let makerPublicKey: Uint8Array | undefined;
-        let introspectorPubkey: Uint8Array | undefined;
+        let emulatorPubkey: Uint8Array | undefined;
         let exitTimelock: RelativeTimelock | undefined;
 
         let offset = 0;
@@ -241,8 +239,8 @@ export namespace Offer {
                 case TLV_MAKER_PUBLIC_KEY:
                     makerPublicKey = value;
                     break;
-                case TLV_INTROSPECTOR_PUBKEY:
-                    introspectorPubkey = value;
+                case TLV_EMULATOR_PUBKEY:
+                    emulatorPubkey = value;
                     break;
                 case TLV_EXIT_TIMELOCK:
                     exitTimelock = {
@@ -263,8 +261,8 @@ export namespace Offer {
             throw new Error("Missing required field: wantAmount");
         if (!makerPkScript)
             throw new Error("Missing required field: makerPkScript");
-        if (!introspectorPubkey)
-            throw new Error("Missing required field: introspectorPubkey");
+        if (!emulatorPubkey)
+            throw new Error("Missing required field: emulatorPubkey");
 
         if (makerPkScript.length !== 34) {
             throw new Error(
@@ -276,9 +274,9 @@ export namespace Offer {
                 `Invalid makerPublicKey: expected 32 bytes, got ${makerPublicKey.length}`
             );
         }
-        if (introspectorPubkey.length !== 32) {
+        if (emulatorPubkey.length !== 32) {
             throw new Error(
-                `Invalid introspectorPubkey: expected 32 bytes, got ${introspectorPubkey.length}`
+                `Invalid emulatorPubkey: expected 32 bytes, got ${emulatorPubkey.length}`
             );
         }
 
@@ -293,7 +291,7 @@ export namespace Offer {
             ...(exitTimelock !== undefined && { exitTimelock }),
             ...(makerPublicKey !== undefined && { makerPublicKey }),
             makerPkScript,
-            introspectorPubkey,
+            emulatorPubkey,
         };
     }
 
@@ -350,7 +348,7 @@ export namespace Offer {
         const leaves: arkade.ArkadeVtxoInput[] = [
             {
                 arkadeScript: covenantScript(offer),
-                introspectors: [offer.introspectorPubkey],
+                emulators: [offer.emulatorPubkey],
                 tapscript: MultisigTapscript.encode({
                     pubkeys: [serverPubkey],
                 }),

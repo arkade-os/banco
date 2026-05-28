@@ -11,6 +11,22 @@ import {
 } from "@arkade-os/sdk";
 import type { Identity } from "@arkade-os/sdk";
 
+// Polyfill EventSource for Node. The SDK opens SSE subscriptions in the
+// background (ContractWatcher); the swap path itself uses direct RPC, so a
+// no-op stub is enough to silence "EventSource is not defined".
+if (typeof (globalThis as any).EventSource === "undefined") {
+    class StubEventSource {
+        readyState = 0;
+        constructor(public url: string) {}
+        addEventListener(): void {}
+        removeEventListener(): void {}
+        close(): void {
+            this.readyState = 2;
+        }
+    }
+    (globalThis as any).EventSource = StubEventSource;
+}
+
 const arkdExec = "docker exec -t arkd";
 
 export interface TestArkWallet {

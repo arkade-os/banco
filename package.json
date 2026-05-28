@@ -32,15 +32,15 @@
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "vitest run test/e2e",
-        "regtest:start": "./regtest/start-env.sh --env .env.regtest && docker compose -f docker-compose.introspector.yml up -d && (docker exec arkd ark init --password secret --server-url localhost:7070 --explorer http://chopsticks:3000 2>/dev/null || true)",
-        "regtest:stop": "docker compose -f docker-compose.introspector.yml down 2>/dev/null; ./regtest/stop-env.sh",
-        "regtest:clean": "docker compose -f docker-compose.introspector.yml down -v 2>/dev/null; ./regtest/clean-env.sh",
+        "regtest:start": "./regtest/start-env.sh --env .env.regtest && docker compose -f docker-compose.emulator.yml up -d && (docker exec arkd ark init --password secret --server-url localhost:7070 --explorer http://chopsticks:3000 2>/dev/null || true)",
+        "regtest:stop": "docker compose -f docker-compose.emulator.yml down 2>/dev/null; ./regtest/stop-env.sh",
+        "regtest:clean": "docker compose -f docker-compose.emulator.yml down -v 2>/dev/null; ./regtest/clean-env.sh",
         "regtest": "pnpm regtest:clean && pnpm regtest:start",
         "format": "prettier --write src test",
         "lint": "prettier --check src test"
     },
     "dependencies": {
-        "@arkade-os/sdk": "github:louisinger/wallet-sdk#arkade-script-final",
+        "@arkade-os/sdk": "github:louisinger/wallet-sdk#arkade-script-final&path:/packages/ts-sdk",
         "@scure/base": "2.0.0"
     },
     "devDependencies": {

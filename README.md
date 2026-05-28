@@ -17,7 +17,7 @@ Banco uses a **maker/taker** model where the maker publishes an offer and goes o
 
 2. **Maker funds the swap address** -- The maker sends their funds (BTC or assets) to a special VTXO whose spending conditions are governed by the covenant. The offer data is embedded in the funding transaction's extension output so the taker can discover it by txid.
 
-3. **Taker discovers and fulfills** -- The taker decodes the offer (either from hex or by reading the extension packet from the funding transaction), selects coins from their own wallet, and builds a transaction that satisfies the covenant. The fulfillment transaction is routed through the introspector (for covenant validation) and then submitted to the Ark server.
+3. **Taker discovers and fulfills** -- The taker decodes the offer (either from hex or by reading the extension packet from the funding transaction), selects coins from their own wallet, and builds a transaction that satisfies the covenant. The fulfillment transaction is routed through the emulator (for covenant validation) and then submitted to the Ark server.
 
 4. **Settlement** -- After fulfillment, the maker receives the wanted amount at their address, and the taker receives the maker's locked funds. Both sides settle atomically within a single Ark transaction.
 
@@ -40,7 +40,7 @@ The full VTXO taptree can include up to three leaves:
 
 | Leaf | Purpose | Condition |
 |------|---------|-----------|
-| **Fulfill** | Covenant script + introspector + server multisig | Taker satisfies the covenant |
+| **Fulfill** | Covenant script + emulator + server multisig | Taker satisfies the covenant |
 | **Cancel** (optional) | CLTV + maker + server multisig | Maker reclaims after timelock |
 | **Exit** (optional) | CSV + maker + server multisig | Unilateral exit after relative timelock |
 
@@ -56,7 +56,7 @@ Offers are serialized as a sequence of TLV (Type-Length-Value) records and wrapp
 | `0x04` | `cancelDelay` | CLTV timestamp for cancellation (optional) |
 | `0x05` | `makerPkScript` | Maker's taproot scriptPubKey (34B) |
 | `0x07` | `makerPublicKey` | Maker's x-only public key (32B) |
-| `0x08` | `introspectorPubkey` | Introspector's x-only public key (32B) |
+| `0x08` | `emulatorPubkey` | Emulator's x-only public key (32B) |
 | `0x0b` | `offerAsset` | Asset being offered (optional) |
 | `0x0c` | `exitTimelock` | Relative timelock for unilateral exit (optional) |
 
@@ -73,7 +73,7 @@ pnpm add @arkade-os/banco
 ```ts
 import { Maker } from "@arkade-os/banco";
 
-const maker = new Maker(wallet, arkServerUrl, introspectorUrl);
+const maker = new Maker(wallet, arkServerUrl, emulatorUrl);
 
 const { offer, swapPkScript, packet } = await maker.createOffer({
   wantAmount: 10_000n, // 10k sats
@@ -95,7 +95,7 @@ await wallet.send({
 ```ts
 import { Taker } from "@arkade-os/banco";
 
-const taker = new Taker(wallet, arkServerUrl, introspectorUrl);
+const taker = new Taker(wallet, arkServerUrl, emulatorUrl);
 
 // From hex-encoded offer
 const { txid } = await taker.fulfill(offerHex);
@@ -138,10 +138,10 @@ pnpm build      # compile TypeScript
 ### End-to-end tests
 
 E2E tests run against a local regtest stack: nigiri + arkd (matching ts-sdk's
-config) + introspector v0.0.1.
+config) + emulator v0.0.1.
 
 ```sh
-pnpm regtest:start   # bring up nigiri, arkd, introspector
+pnpm regtest:start   # bring up nigiri, arkd, emulator
 pnpm test:e2e        # run test/e2e/*
 pnpm regtest:stop    # tear down (preserves volumes)
 pnpm regtest:clean   # tear down + wipe volumes
@@ -150,8 +150,8 @@ pnpm regtest         # clean + start
 
 `regtest/` is the [arkade-regtest](https://github.com/ArkLabsHQ/arkade-regtest)
 submodule. Overrides for arkd image, fees, and Bitcoin Core config live in
-`.env.regtest`. The introspector is layered on top via
-`docker-compose.introspector.yml`.
+`.env.regtest`. The emulator is layered on top via
+`docker-compose.emulator.yml`.
 
 ## License
 

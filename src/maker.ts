@@ -3,7 +3,7 @@ import {
     ArkAddress,
     RestArkProvider,
     RestIndexerProvider,
-    RestIntrospectorProvider,
+    RestEmulatorProvider,
     CLTVMultisigTapscript,
     CSVMultisigTapscript,
     Transaction,
@@ -67,7 +67,7 @@ export interface OfferStatus {
  *
  * @example
  * ```ts
- * const maker = new banco.Maker(wallet, serverUrl, introspectorUrl);
+ * const maker = new banco.Maker(wallet, serverUrl, emulatorUrl);
  * const { offer, swapPkScript } = await maker.createOffer({ wantAmount: 10_000n });
  * await wallet.send({ address: swapAddress, amount: 50_000 }); // encode swapPkScript to address
  * ```
@@ -75,16 +75,16 @@ export interface OfferStatus {
 export class Maker {
     private readonly arkProvider: RestArkProvider;
     private readonly indexer: RestIndexerProvider;
-    private readonly introspector: RestIntrospectorProvider;
+    private readonly emulator: RestEmulatorProvider;
 
     constructor(
         private readonly wallet: IWallet,
         arkServerUrl: string,
-        introspectorUrl: string
+        emulatorUrl: string
     ) {
         this.arkProvider = new RestArkProvider(arkServerUrl);
         this.indexer = new RestIndexerProvider(arkServerUrl);
-        this.introspector = new RestIntrospectorProvider(introspectorUrl);
+        this.emulator = new RestEmulatorProvider(emulatorUrl);
     }
 
     /**
@@ -102,12 +102,10 @@ export class Maker {
         const info = await this.arkProvider.getInfo();
         const serverPubKey = hex.decode(info.signerPubkey).slice(1);
 
-        const introInfo = await this.introspector.getInfo();
-        const rawIntroPubkey = hex.decode(introInfo.signerPubkey);
-        const introspectorPubkey =
-            rawIntroPubkey.length === 33
-                ? rawIntroPubkey.slice(1)
-                : rawIntroPubkey;
+        const emuInfo = await this.emulator.getInfo();
+        const rawEmuPubkey = hex.decode(emuInfo.signerPubkey);
+        const emulatorPubkey =
+            rawEmuPubkey.length === 33 ? rawEmuPubkey.slice(1) : rawEmuPubkey;
 
         const address = await this.wallet.getAddress();
         const decoded = ArkAddress.decode(address);
@@ -153,7 +151,7 @@ export class Maker {
             exitTimelock,
             makerPkScript,
             makerPublicKey,
-            introspectorPubkey,
+            emulatorPubkey,
         };
 
         const swapPkScript = Offer.vtxoScript(offerData, serverPubKey).pkScript;
@@ -182,7 +180,7 @@ export class Maker {
             value: v.value,
             assets: v.assets?.map((a) => ({
                 assetId: a.assetId,
-                amount: a.amount,
+                amount: Number(a.amount),
             })),
             spendable: v.virtualStatus.state !== "spent",
         }));

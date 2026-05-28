@@ -10,7 +10,7 @@ import { Maker, Taker } from "../../src";
 import { beforeEachFaucet, createTestArkWallet, faucetOffchain } from "./utils";
 
 const ARK_SERVER_URL = "http://localhost:7070";
-const INTROSPECTOR_URL = "http://localhost:7073";
+const EMULATOR_URL = "http://localhost:7073";
 
 describe("banco", () => {
     const indexer = new RestIndexerProvider(ARK_SERVER_URL);
@@ -50,10 +50,10 @@ describe("banco", () => {
             // ── Step 1: Maker issues an asset ──
             const assetAmount = 1000;
             faucetOffchain(makerAddress, 20_000);
-            await new Promise((r) => setTimeout(r, 1000));
+            await waitForVtxo(ArkAddress.decode(makerAddress).pkScript, 1);
 
             const issueResult = await makerWallet.wallet.assetManager.issue({
-                amount: assetAmount,
+                amount: BigInt(assetAmount),
             });
             expect(issueResult.assetId).toBeDefined();
             await new Promise((r) => setTimeout(r, 2000));
@@ -62,7 +62,7 @@ describe("banco", () => {
             const maker = new Maker(
                 makerWallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const wantAmount = 10_000n;
@@ -83,7 +83,12 @@ describe("banco", () => {
             await makerWallet.wallet.send({
                 address: swapAddress,
                 amount: 0,
-                assets: [{ assetId: issueResult.assetId, amount: assetAmount }],
+                assets: [
+                    {
+                        assetId: issueResult.assetId,
+                        amount: BigInt(assetAmount),
+                    },
+                ],
             });
             await new Promise((r) => setTimeout(r, 2000));
 
@@ -100,7 +105,7 @@ describe("banco", () => {
             const taker = new Taker(
                 takerWallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const { txid } = await taker.fulfill(offerHex);
@@ -126,7 +131,7 @@ describe("banco", () => {
                 (a: any) => a.assetId === issueResult.assetId
             );
             expect(takerAsset).toBeDefined();
-            expect(takerAsset!.amount).toBe(assetAmount);
+            expect(takerAsset!.amount).toBe(BigInt(assetAmount));
 
             console.log(
                 `Swap complete: maker got ${makerBtcReceived} sats BTC, ` +
@@ -149,10 +154,10 @@ describe("banco", () => {
             // ── Step 1: Maker issues asset A ──
             const assetAAmount = 500;
             faucetOffchain(makerAddress, 20_000);
-            await new Promise((r) => setTimeout(r, 1000));
+            await waitForVtxo(ArkAddress.decode(makerAddress).pkScript, 1);
 
             const issueA = await makerWallet.wallet.assetManager.issue({
-                amount: assetAAmount,
+                amount: BigInt(assetAAmount),
             });
             expect(issueA.assetId).toBeDefined();
             await new Promise((r) => setTimeout(r, 2000));
@@ -163,7 +168,7 @@ describe("banco", () => {
             await new Promise((r) => setTimeout(r, 1000));
 
             const issueB = await takerWallet.wallet.assetManager.issue({
-                amount: assetBAmount,
+                amount: BigInt(assetBAmount),
             });
             expect(issueB.assetId).toBeDefined();
             await new Promise((r) => setTimeout(r, 2000));
@@ -172,7 +177,7 @@ describe("banco", () => {
             const maker = new Maker(
                 makerWallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const wantAsset = asset.AssetId.fromString(issueB.assetId);
@@ -195,7 +200,9 @@ describe("banco", () => {
             await makerWallet.wallet.send({
                 address: swapAddress2,
                 amount: 0,
-                assets: [{ assetId: issueA.assetId, amount: assetAAmount }],
+                assets: [
+                    { assetId: issueA.assetId, amount: BigInt(assetAAmount) },
+                ],
             });
             await new Promise((r) => setTimeout(r, 2000));
 
@@ -206,7 +213,7 @@ describe("banco", () => {
             const taker = new Taker(
                 takerWallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const { txid } = await taker.fulfill(offerHex);
@@ -225,7 +232,7 @@ describe("banco", () => {
                 (a: any) => a.assetId === issueB.assetId
             );
             expect(makerAssetB).toBeDefined();
-            expect(makerAssetB!.amount).toBe(assetBAmount);
+            expect(makerAssetB!.amount).toBe(BigInt(assetBAmount));
 
             // Taker should have received asset A
             const takerDecoded = ArkAddress.decode(takerAddress);
@@ -237,7 +244,7 @@ describe("banco", () => {
                 (a: any) => a.assetId === issueA.assetId
             );
             expect(takerAssetA).toBeDefined();
-            expect(takerAssetA!.amount).toBe(assetAAmount);
+            expect(takerAssetA!.amount).toBe(BigInt(assetAAmount));
 
             console.log(
                 `Asset swap complete: maker got ${assetBAmount} of asset B, ` +
@@ -259,10 +266,10 @@ describe("banco", () => {
             // ── Step 1: Maker issues an asset ──
             const assetAmount = 1000;
             faucetOffchain(makerAddress, 20_000);
-            await new Promise((r) => setTimeout(r, 1000));
+            await waitForVtxo(ArkAddress.decode(makerAddress).pkScript, 1);
 
             const issueResult = await makerWallet.wallet.assetManager.issue({
-                amount: assetAmount,
+                amount: BigInt(assetAmount),
             });
             const offerAsset = asset.AssetId.fromString(issueResult.assetId);
             expect(issueResult.assetId).toBeDefined();
@@ -275,7 +282,7 @@ describe("banco", () => {
             const maker = new Maker(
                 makerWallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const wantAmount = 10_000n;
@@ -299,7 +306,12 @@ describe("banco", () => {
             await makerWallet.wallet.send({
                 address: swapAddress,
                 amount: 0,
-                assets: [{ assetId: issueResult.assetId, amount: assetAmount }],
+                assets: [
+                    {
+                        assetId: issueResult.assetId,
+                        amount: BigInt(assetAmount),
+                    },
+                ],
             });
             await new Promise((r) => setTimeout(r, 2000));
 
@@ -317,7 +329,7 @@ describe("banco", () => {
             const taker = new Taker(
                 takerWallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const { txid } = await taker.fulfill(offerHex, {
@@ -348,7 +360,7 @@ describe("banco", () => {
                 (a: any) => a.assetId === issueResult.assetId
             );
             expect(takerAsset).toBeDefined();
-            expect(takerAsset!.amount).toBe(500);
+            expect(takerAsset!.amount).toBe(500n);
 
             // Swap VTXO should still exist with remaining 500 asset units
             const remainingVtxos = await waitForVtxo(swapPkScript, 1);
@@ -357,7 +369,7 @@ describe("banco", () => {
                 (a: any) => a.assetId === issueResult.assetId
             );
             expect(remainingAsset).toBeDefined();
-            expect(remainingAsset!.amount).toBe(500);
+            expect(remainingAsset!.amount).toBe(500n);
 
             console.log(
                 `Partial fill complete: maker got ${makerBtcReceived} sats BTC, ` +
@@ -379,7 +391,7 @@ describe("banco", () => {
             const taker2 = new Taker(
                 taker2Wallet.wallet,
                 ARK_SERVER_URL,
-                INTROSPECTOR_URL
+                EMULATOR_URL
             );
 
             const { txid: txid2 } = await taker2.fulfill(offerHex, {
@@ -396,7 +408,10 @@ describe("banco", () => {
             expect(finalSwapResp.vtxos).toHaveLength(0);
 
             // Maker should have received both fills.
-            const makerAfterSecond = await waitForVtxo(makerDecoded.pkScript, 4);
+            const makerAfterSecond = await waitForVtxo(
+                makerDecoded.pkScript,
+                4
+            );
             const makerBtcAfterSecond = makerAfterSecond.reduce(
                 (s: number, v: any) => s + v.value,
                 0
@@ -411,10 +426,10 @@ describe("banco", () => {
             const taker2AssetTotal = taker2Vtxos
                 .flatMap((v: any) => v.assets ?? [])
                 .filter((a: any) => a.assetId === issueResult.assetId)
-                .reduce((s: number, a: any) => s + a.amount, 0);
-            expect(taker2AssetTotal).toBe(500);
+                .reduce((s: bigint, a: any) => s + a.amount, 0n);
+            expect(taker2AssetTotal).toBe(500n);
             const totalDistributed = takerAsset!.amount + taker2AssetTotal;
-            expect(totalDistributed).toBe(assetAmount);
+            expect(totalDistributed).toBe(BigInt(assetAmount));
 
             console.log(
                 `Second fill complete: swap fully consumed, ` +

@@ -3,7 +3,7 @@ import {
     ArkAddress,
     RestArkProvider,
     RestIndexerProvider,
-    RestIntrospectorProvider,
+    RestEmulatorProvider,
     CSVMultisigTapscript,
     MultisigTapscript,
     Transaction,
@@ -11,7 +11,7 @@ import {
     arkade,
     asset,
     Extension,
-    IntrospectorPacket,
+    EmulatorPacket,
     PrevArkTxField,
     selectCoinsWithAsset,
     selectVirtualCoins,
@@ -29,27 +29,27 @@ export interface FulfillOptions {
  * Taker of a banco swap.
  *
  * Decodes an offer, locates the swap VTXO, builds the fulfillment
- * transaction, and submits it through the introspector and ark server.
+ * transaction, and submits it through the emulator and ark server.
  *
  * @example
  * ```ts
- * const taker = new banco.Taker(wallet, serverUrl, introspectorUrl);
+ * const taker = new banco.Taker(wallet, serverUrl, emulatorUrl);
  * const { txid } = await taker.fulfill(offerHex);
  * ```
  */
 export class Taker {
     private readonly arkProvider: RestArkProvider;
     private readonly indexer: RestIndexerProvider;
-    private readonly introspector: RestIntrospectorProvider;
+    private readonly emulator: RestEmulatorProvider;
 
     constructor(
         private readonly wallet: IWallet,
         arkServerUrl: string,
-        introspectorUrl: string
+        emulatorUrl: string
     ) {
         this.arkProvider = new RestArkProvider(arkServerUrl);
         this.indexer = new RestIndexerProvider(arkServerUrl);
-        this.introspector = new RestIntrospectorProvider(introspectorUrl);
+        this.emulator = new RestEmulatorProvider(emulatorUrl);
     }
 
     /**
@@ -131,7 +131,7 @@ export class Taker {
             pubkeys: [
                 serverPubKey,
                 arkade.computeArkadeScriptPublicKey(
-                    offer.introspectorPubkey,
+                    offer.emulatorPubkey,
                     covenantScriptBytes
                 ),
             ],
@@ -516,7 +516,7 @@ export class Taker {
 
         // ── Extension ──
         const extensionPackets: Parameters<typeof Extension.create>[0] = [
-            IntrospectorPacket.create([
+            EmulatorPacket.create([
                 {
                     vin: 0,
                     script: covenantScriptBytes,
@@ -548,9 +548,9 @@ export class Taker {
         );
 
         // Partial-fill scripts inspect the swap VTXO's previous output via
-        // INSPECTINPUTSCRIPTPUBKEY / INSPECTINPUTVALUE. The introspector resolves
+        // INSPECTINPUTSCRIPTPUBKEY / INSPECTINPUTVALUE. The emulator resolves
         // those by reading PrevArkTxField from the ark tx's input. Set it to the
-        // funding tx of the swap VTXO so the introspector can fetch the prev out.
+        // funding tx of the swap VTXO so the emulator can fetch the prev out.
         if (isPartial) {
             const { txs: fundingTxs } = await this.indexer.getVirtualTxs([
                 swapVtxo.txid,
@@ -573,8 +573,8 @@ export class Taker {
         );
 
         // Pre-sign each taker checkpoint (input 0) before sending to the
-        // introspector. Skip checkpoint 0 — that's the swap VTXO checkpoint,
-        // which has no taker key in its closure (the introspector signs it).
+        // emulator. Skip checkpoint 0 — that's the swap VTXO checkpoint,
+        // which has no taker key in its closure (the emulator signs it).
         const signedCheckpoints = await Promise.all(
             checkpoints.map(async (cp, i) => {
                 if (i === 0) return cp;
@@ -582,17 +582,17 @@ export class Taker {
             })
         );
 
-        // Submit to the introspector. Because the introspector tweaked key is
-        // the last non-arkd signer in the swap fulfill closure, the introspector
+        // Submit to the emulator. Because the emulator tweaked key is
+        // the last non-arkd signer in the swap fulfill closure, the emulator
         // takes on the finalizer role: it forwards to arkd, merges arkd's
         // checkpoint signatures, calls FinalizeTx, and returns the final ark tx.
-        const introResult = await this.introspector.submitTx(
+        const emuResult = await this.emulator.submitTx(
             base64.encode(signedArkTx.toPSBT()),
             signedCheckpoints.map((c) => base64.encode(c.toPSBT()))
         );
 
         const finalArkTx = Transaction.fromPSBT(
-            base64.decode(introResult.signedArkTx)
+            base64.decode(emuResult.signedArkTx)
         );
         return { txid: finalArkTx.id };
     }
@@ -620,7 +620,7 @@ export class Taker {
                     collateral.set(a.assetId, entry);
                 }
                 entry.inputs.push(asset.AssetInput.create(i + 1, a.amount));
-                entry.total += a.amount;
+                entry.total += Number(a.amount);
             }
         }
         for (const [id, { inputs, total }] of collateral) {

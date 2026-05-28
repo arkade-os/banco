@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@arkade-os/sdk':
-        specifier: github:louisinger/wallet-sdk#arkade-script-final
-        version: https://codeload.github.com/louisinger/wallet-sdk/tar.gz/1673ce4d5bc17868fcafb7b2482acf686a408ca0
+        specifier: github:louisinger/wallet-sdk#arkade-script-final&path:/packages/ts-sdk
+        version: https://codeload.github.com/louisinger/wallet-sdk/tar.gz/66f24ca9f555420ccbfd077a7ae20de28ecfabbe#path:/packages/ts-sdk
       '@scure/base':
         specifier: 2.0.0
         version: 2.0.0
@@ -37,16 +37,16 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@arkade-os/sdk@https://codeload.github.com/louisinger/wallet-sdk/tar.gz/1673ce4d5bc17868fcafb7b2482acf686a408ca0':
-    resolution: {tarball: https://codeload.github.com/louisinger/wallet-sdk/tar.gz/1673ce4d5bc17868fcafb7b2482acf686a408ca0}
-    version: 0.4.19
-    engines: {node: '>=22.12.0 <23', pnpm: '>=10.25.0 <11'}
+  '@arkade-os/sdk@https://codeload.github.com/louisinger/wallet-sdk/tar.gz/66f24ca9f555420ccbfd077a7ae20de28ecfabbe#path:/packages/ts-sdk':
+    resolution: {path: /packages/ts-sdk, tarball: https://codeload.github.com/louisinger/wallet-sdk/tar.gz/66f24ca9f555420ccbfd077a7ae20de28ecfabbe}
+    version: 0.4.28
+    engines: {node: '>=22.12.0 <25'}
     peerDependencies:
       '@react-native-async-storage/async-storage': '>=1.0.0'
       expo: '>=54.0.0'
-      expo-background-task: ~1.0.10
-      expo-sqlite: ~16.0.10
-      expo-task-manager: ~14.0.9
+      expo-background-task: ~1.0.10 || >=55.0.0
+      expo-sqlite: ~16.0.10 || >=55.0.0
+      expo-task-manager: ~14.0.9 || >=55.0.0
     peerDependenciesMeta:
       '@react-native-async-storage/async-storage':
         optional: true
@@ -993,7 +993,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@arkade-os/sdk@https://codeload.github.com/louisinger/wallet-sdk/tar.gz/1673ce4d5bc17868fcafb7b2482acf686a408ca0':
+  '@arkade-os/sdk@https://codeload.github.com/louisinger/wallet-sdk/tar.gz/66f24ca9f555420ccbfd077a7ae20de28ecfabbe#path:/packages/ts-sdk':
     dependencies:
       '@bitcoinerlab/descriptors-scure': 3.1.7
       '@marcbachmann/cel-js': 7.3.1
